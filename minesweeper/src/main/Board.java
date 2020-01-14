@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Random;
 
 public class Board extends JPanel {
-    private List<Integer> field;
+    private List<Cell> field;
     private Boolean inGame;
     private Integer minesLeft;
     private List<Image> images;
@@ -22,19 +22,19 @@ public class Board extends JPanel {
         initBoard();
     }
 
-    public void initBoard() {
+    private void initBoard() {
         setPreferredSize(new Dimension(Config.BOARD_WIDTH, Config.BOARD_HEIGHT));
 
-        images = loadImages(Config.IMAGE_NUMBER);
+        images = loadImages();
 
         addMouseListener(new MineAdapter());
         newGame();
     }
 
-    private List<Image> loadImages(Integer imageNumber) {
+    private List<Image> loadImages() {
         List<Image> finalList = new ArrayList<>();
 
-        for(Integer x = 0; x < imageNumber; x++) {
+        for(Integer x = 0; x < Config.IMAGE_NUMBER; x++) {
             String path = "minesweeper/src/resources/" + x + ".png";
             finalList.add(new ImageIcon(path).getImage());
         }
@@ -43,147 +43,77 @@ public class Board extends JPanel {
     }
 
     private void newGame() {
-        Integer cell;
-
         Random random = new Random();
         inGame = true;
         minesLeft = Config.MINES;
-
         totalCells = Config.ROWS * Config.COLUMNS;
-
         field = new ArrayList<>();
 
         for(Integer x = 0; x < totalCells; x++) {
-            field.add(Config.COVER_FOR_CELL);
+            field.add(new CoveredCell());
         }
 
         statusLabel.setText(Integer.toString(minesLeft));
-
         Integer mineCounter = 0;
 
         while(mineCounter < Config.MINES) {
-            Integer position = (int) (totalCells * random.nextDouble());
+            double rawPosition = totalCells * random.nextDouble();
+            Integer position = new Double(rawPosition).intValue();
 
-            if((position < totalCells) && (field.get(position) != Config.COVERED_MINE_CELL)) {
+            if(position < totalCells && !field.get(position).getType().equals(Config.COVERED_MINE_CELL)) {
                 Integer currentColumn = position % Config.COLUMNS;
-                field.set(position, Config.COVERED_MINE_CELL);
+                field.set(position, new CoveredMineCell());
                 mineCounter++;
 
-                if(currentColumn > 0) {
-                    cell = position - 1 - Config.COLUMNS;
-                    if(cell >= 0) {
-                        if(field.get(cell) != Config.COVERED_MINE_CELL) {
-                            Integer cellValue = field.get(cell);
-                            field.set(cell, cellValue + 1);
-                        }
-                    }
-
-                    cell = position - 1;
-
-                    if(cell >= 0) {
-                        if(field.get(cell) != Config.COVERED_MINE_CELL) {
-                            Integer cellValue = field.get(cell);
-                            field.set(cell, cellValue + 1);
-                        }
-                    }
-
-                    cell = position + Config.COLUMNS - 1;
-
-                    if(cell < totalCells) {
-                        if(field.get(cell) != Config.COVERED_MINE_CELL) {
-                            Integer cellValue = field.get(cell);
-                            field.set(cell, cellValue + 1);
-                        }
-                    }
-                }
-
-                cell = position - Config.COLUMNS;
-
-                if(cell >= 0) {
-                    if(field.get(cell)  != Config.COVERED_MINE_CELL) {
-                        Integer cellValue = field.get(cell);
-                        field.set(cell, cellValue + 1);
-                    }
-                }
-
-                cell = position + Config.COLUMNS;
-
-                if(cell < totalCells) {
-                    if(field.get(cell)  != Config.COVERED_MINE_CELL) {
-                        Integer cellValue = field.get(cell);
-                        field.set(cell, cellValue + 1);
-                    }
-                }
-
-                if(currentColumn < (Config.COLUMNS - 1)) {
-                    cell = position - Config.COLUMNS + 1;
-
-                    if(cell >= 0) {
-                        if(field.get(cell)  != Config.COVERED_MINE_CELL) {
-                            Integer cellValue = field.get(cell);
-                            field.set(cell, cellValue + 1);
-                        }
-                    }
-
-                    cell = position + Config.COLUMNS + 1;
-
-                    if(cell < totalCells) {
-                        if(field.get(cell)  != Config.COVERED_MINE_CELL) {
-                            Integer cellValue = field.get(cell);
-                            field.set(cell, cellValue + 1);
-                        }
-                    }
-
-                    cell = position + 1;
-
-                    if(cell < totalCells) {
-                        if(field.get(cell)  != Config.COVERED_MINE_CELL) {
-                            Integer cellValue = field.get(cell);
-                            field.set(cell, cellValue + 1);
-                        }
-                    }
-                }
+                BoardUtils.updateLeftSide(field, currentColumn, position);
+                BoardUtils.updateTopAndBottom(field, position);
+                BoardUtils.updateRightSide(field, currentColumn, position);
             }
         }
     }
 
     @Override
     public void paintComponent(Graphics graphics) {
-        Integer uncover = 0;
+        int uncover = 0;
 
-        for(Integer x = 0; x < Config.ROWS; x++) {
-            for(Integer y = 0; y < Config.COLUMNS; y++) {
-                Integer cell = field.get((x * Config.COLUMNS) + y);
-                if(inGame && cell == Config.MINE_CELL) {
-                    inGame = false;
-                }
-
-                if(!inGame) {
-                    if(cell == Config.COVERED_MINE_CELL) {
-                        cell = Config.DRAW_MINE;
-                    }
-                    else if(cell == Config.MARKED_MINE_CELL) {
-                        cell = Config.DRAW_MARK;
-                    }
-                    else if(cell > Config.COVERED_MINE_CELL) {
-                        cell = Config.DRAW_WRONG_MARK;
-                    }
-                    else if(cell > Config.MINE_CELL) {
-                        cell = Config.DRAW_COVER;
-                    }
-                }
-                else {
-                    if(cell > Config.COVERED_MINE_CELL) {
-                        cell = Config.DRAW_MARK;
-                    }
-                    else if(cell > Config.MINE_CELL) {
-                        cell = Config.DRAW_COVER;
-                        uncover++;
-                    }
-                }
-
-                graphics.drawImage(images.get(cell), (y * Config.CELL_SIZE), (x * Config.CELL_SIZE), this);
+        for (Integer x = 0; x < totalCells; x++) {
+            Integer cellType = field.get(x).getType();
+            if (inGame && cellType.equals(Config.MINE_CELL)) {
+                inGame = false;
             }
+
+            if (!inGame) {
+                if (cellType.equals(Config.COVERED_MINE_CELL)) {
+                    cellType = Config.DRAW_MINE;
+                }
+                else if (cellType.equals(Config.MARKED_MINE_CELL)) {
+                    cellType = Config.DRAW_MARK;
+                }
+                else if (cellType > Config.COVERED_MINE_CELL) {
+                    cellType = Config.DRAW_WRONG_MARK;
+                }
+                else if (cellType > Config.MINE_CELL) {
+                    cellType = Config.DRAW_COVER;
+                }
+            }
+            else {
+                if (cellType > Config.COVERED_MINE_CELL) {
+                    cellType = Config.DRAW_MARK;
+                }
+                else if (cellType > Config.MINE_CELL) {
+                    cellType = Config.DRAW_COVER;
+                    uncover++;
+                }
+            }
+
+            if (cellType < 0) {
+                cellType = 0;
+            }
+
+            int xCoordinate = x % Config.COLUMNS * Config.CELL_SIZE;
+            int yCoordinate = x / Config.ROWS * Config.CELL_SIZE;
+
+            graphics.drawImage(images.get(cellType), xCoordinate, yCoordinate, this);
         }
 
         if(uncover == 0 && inGame) {
@@ -192,110 +122,6 @@ public class Board extends JPanel {
         }
         else if(!inGame) {
             statusLabel.setText("Game lost");
-        }
-    }
-
-    private void findEmptyCells(Integer index) {
-        Integer currentColumn = index % Config.COLUMNS;
-        Integer cell;
-
-        if(currentColumn > 0) {
-            cell = index - Config.COLUMNS - 1;
-
-            if(cell >= 0) {
-                if(field.get(cell) > Config.MINE_CELL) {
-                    Integer cellValue = field.get(cell);
-                    field.set(cell, cellValue - Config.COVER_FOR_CELL);
-                    if(field.get(cell) == Config.EMPTY_CELL) {
-                        findEmptyCells(cell);
-                    }
-                }
-            }
-
-            cell = index - 1;
-
-            if(cell >= 0) {
-                if(field.get(cell) > Config.MINE_CELL) {
-                    Integer cellValue = field.get(cell);
-                    field.set(cell, cellValue - Config.COVER_FOR_CELL);
-                    if(field.get(cell) == Config.EMPTY_CELL) {
-                        findEmptyCells(cell);
-                    }
-                }
-            }
-
-            cell = index + Config.COLUMNS - 1;
-
-            if(cell < totalCells) {
-                if(field.get(cell) > Config.MINE_CELL) {
-                    Integer cellValue = field.get(cell);
-                    field.set(cell, cellValue - Config.COVER_FOR_CELL);
-                    if(field.get(cell) == Config.EMPTY_CELL) {
-                        findEmptyCells(cell);
-                    }
-                }
-            }
-        }
-
-        cell = index - Config.COLUMNS;
-
-        if(cell >= 0) {
-            if(field.get(cell) > Config.MINE_CELL) {
-                Integer cellValue = field.get(cell);
-                field.set(cell, cellValue - Config.COVER_FOR_CELL);
-                if(field.get(cell) == Config.EMPTY_CELL) {
-                    findEmptyCells(cell);
-                }
-            }
-        }
-
-        cell = index + Config.COLUMNS;
-
-        if(cell < totalCells) {
-            if(field.get(cell) > Config.MINE_CELL) {
-                Integer cellValue = field.get(cell);
-                field.set(cell, cellValue - Config.COVER_FOR_CELL);
-                if(field.get(cell) == Config.EMPTY_CELL) {
-                    findEmptyCells(cell);
-                }
-            }
-        }
-
-        if(currentColumn < (Config.COLUMNS - 1)) {
-            cell = index - Config.COLUMNS + 1;
-            if(cell >= 0) {
-                if(field.get(cell) > Config.MINE_CELL) {
-                    Integer cellValue = field.get(cell);
-                    field.set(cell, cellValue - Config.COVER_FOR_CELL);
-                    if(field.get(cell) == Config.EMPTY_CELL) {
-                        findEmptyCells(cell);
-                    }
-                }
-            }
-
-            cell = index + Config.COLUMNS + 1;
-
-            if(cell < totalCells) {
-                if(field.get(cell) > Config.MINE_CELL) {
-                    Integer cellValue = field.get(cell);
-                    field.set(cell, cellValue - Config.COVER_FOR_CELL);
-                    if(field.get(cell) == Config.EMPTY_CELL) {
-                        findEmptyCells(cell);
-                    }
-                }
-            }
-
-            cell = index + 1;
-
-            if(cell < totalCells) {
-                if(field.get(cell) > Config.MINE_CELL) {
-                    Integer cellValue = field.get(cell);
-                    field.set(cell, cellValue - Config.COVER_FOR_CELL);
-                    if(field.get(cell) == Config.EMPTY_CELL) {
-                        findEmptyCells(cell);
-                    }
-                }
-            }
         }
     }
 
@@ -308,64 +134,89 @@ public class Board extends JPanel {
             Integer eventColumn = xCoordinate / Config.CELL_SIZE;
             Integer eventRow = yCoordinate / Config.CELL_SIZE;
 
-            Boolean doRepaint = false;
+            boolean doRepaint = false;
 
-            if(!inGame) {
+            if (!inGame) {
                 newGame();
                 repaint();
             }
 
-            if((xCoordinate < Config.COLUMNS * Config.CELL_SIZE) && (yCoordinate < Config.ROWS * Config.CELL_SIZE)) {
-                if(event.getButton() == MouseEvent.BUTTON3) {
-                    if(field.get(eventRow * Config.COLUMNS + eventColumn) > Config.MINE_CELL) {
-                        doRepaint = true;
-
-                        if(field.get(eventRow * Config.COLUMNS + eventColumn) <= Config.COVERED_MINE_CELL) {
-                            if(minesLeft > 0) {
-                                Integer cellValue = field.get(eventRow * Config.COLUMNS + eventColumn);
-                                field.set(eventRow * Config.COLUMNS + eventColumn, cellValue + Config.MARK_FOR_CELL);
-                                minesLeft--;
-                                String message = Integer.toString(minesLeft);
-                                statusLabel.setText(message);
-                            }
-                            else {
-                                statusLabel.setText("No marks left");
-                            }
-                        }
-                        else {
-                            Integer cellValue = field.get(eventRow * Config.COLUMNS + eventColumn);
-                            field.set(eventRow * Config.COLUMNS + eventColumn, cellValue + Config.MARK_FOR_CELL);
-                            minesLeft++;
-                            String message = Integer.toString(minesLeft);
-                            statusLabel.setText(message);
-                        }
-                    }
-                }
-                else {
-                    if(field.get(eventRow * Config.COLUMNS + eventColumn) > Config.COVERED_MINE_CELL) {
-                        return;
-                    }
-
-                    if(field.get(eventRow * Config.COLUMNS+ eventColumn) > Config.MINE_CELL && (field.get(eventColumn * Config.COLUMNS + eventColumn) < Config.MARKED_MINE_CELL)) {
-                        Integer cellValue = field.get(eventRow * Config.COLUMNS + eventColumn);
-
-                        field.set(eventRow * Config.COLUMNS + eventColumn, cellValue - Config.COVER_FOR_CELL);
-                        doRepaint = true;
-
-                        if(field.get(eventRow * Config.COLUMNS + eventColumn) == Config.MINE_CELL) {
-                            inGame = false;
-                        }
-
-                        if(field.get(eventRow * Config.COLUMNS + eventColumn) == Config.EMPTY_CELL) {
-                            findEmptyCells(eventRow * Config.COLUMNS + eventColumn);
-                        }
-                    }
-                }
-
-                if(doRepaint) {
-                    repaint();
+            if (
+                    xCoordinate < Config.COLUMNS * Config.CELL_SIZE &&
+                    yCoordinate < Config.ROWS * Config.CELL_SIZE &&
+                    event.getButton() == MouseEvent.BUTTON3
+            ) {
+                if (field.get(eventRow * Config.COLUMNS + eventColumn).getType() > Config.MINE_CELL) {
+                    doRepaint = true;
+                    markAttempt(field, eventRow, eventColumn);
                 }
             }
+            else {
+                if (field.get(eventRow * Config.COLUMNS + eventColumn).getType() > Config.COVERED_MINE_CELL) {
+                    return;
+                }
+
+                if (
+                        field.get(eventRow * Config.COLUMNS + eventColumn).getType() > Config.MINE_CELL &&
+                        field.get(eventColumn * Config.COLUMNS + eventColumn).getType() < Config.MARKED_MINE_CELL
+                ) {
+                    Integer cellValue = field.get(eventRow * Config.COLUMNS + eventColumn).getType();
+
+                    field.get(eventRow * Config.COLUMNS + eventColumn).setType(cellValue - Config.COVER_FOR_CELL);
+                    doRepaint = true;
+
+                    if (field.get(eventRow * Config.COLUMNS + eventColumn).getType().equals(Config.MINE_CELL)) {
+                        inGame = false;
+                    }
+
+                    if (field.get(eventRow * Config.COLUMNS + eventColumn).getType().equals(Config.EMPTY_CELL)) {
+                        EmptyCellUtils.findEmptyCells(field, eventRow * Config.COLUMNS + eventColumn);
+                    }
+                }
+            }
+
+            if (doRepaint) {
+                repaint();
+            }
         }
+    }
+
+    private void markAttempt(List<Cell> field, Integer eventRow, Integer eventColumn) {
+        if (field.get(eventRow * Config.COLUMNS + eventColumn).getType() <= Config.COVERED_MINE_CELL) {
+            if (minesLeft > 0) {
+                Integer cellValue = field.get(eventRow * Config.COLUMNS + eventColumn).getType();
+                field.get(eventRow * Config.COLUMNS + eventColumn).setType(cellValue + Config.MARK_FOR_CELL);
+                minesLeft--;
+                String message = Integer.toString(minesLeft);
+                statusLabel.setText(message);
+            }
+            else {
+                statusLabel.setText("No marks left");
+            }
+        }
+    }
+
+    public List<Cell> getField() {
+        return field;
+    }
+
+    public Boolean lgetInGame() {
+        return inGame;
+    }
+
+    public Integer getMinesLeft() {
+        return minesLeft;
+    }
+
+    public List<Image> getImages() {
+        return images;
+    }
+
+    public Integer getTotalCells() {
+        return totalCells;
+    }
+
+    public JLabel getStatusLabel() {
+        return statusLabel;
     }
 }

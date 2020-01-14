@@ -4,14 +4,12 @@ import javax.swing.*;
 import java.awt.*;
 
 public class Minesweeper extends JFrame {
-    private JLabel statusLabel;
-
-    public Minesweeper() {
+    private Minesweeper() {
         initUI();
     }
 
     private void initUI() {
-        statusLabel = new JLabel("");
+        JLabel statusLabel = new JLabel("");
         add(statusLabel, BorderLayout.SOUTH);
 
         add(new Board(statusLabel));
